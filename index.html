@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pitch It Up — Business Hackathon</title>
+  <meta name="description" content="Pitch It Up is an interactive business hackathon event where teams pitch, audiences invest, and the best idea wins." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Landing Page -->
+    <div id="page-landing" class="page active">
+      <div class="landing-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="grid-overlay"></div>
+      </div>
+
+      <nav class="landing-nav">
+        <div class="logo">
+          <span class="logo-icon">🚀</span>
+          <span class="logo-text">Pitch <span class="accent">It Up</span></span>
+        </div>
+        <div class="nav-badge">Live Event</div>
+      </nav>
+
+      <main class="landing-main">
+        <div class="hero-section">
+          <div class="hero-tag">
+            <span class="pulse-dot"></span>
+            Business Hackathon 2026
+          </div>
+          <h1 class="hero-title">
+            Where Ideas<br/>
+            <span class="gradient-text">Become Empires</span>
+          </h1>
+          <p class="hero-subtitle">
+            Pitch your startup, attract investors, dominate the market.<br/>
+            The arena is live. Are you ready?
+          </p>
+
+          <div class="login-cards">
+            <!-- Team Login Card -->
+            <div class="login-card" id="card-team">
+              <div class="card-icon">🏢</div>
+              <h3>Team Login</h3>
+              <p>Access your team dashboard, set prices & track investments</p>
+              <button class="btn-card" onclick="showModal('team-login')">Enter as Team</button>
+            </div>
+
+            <!-- Audience Card -->
+            <div class="login-card featured" id="card-audience">
+              <div class="card-badge">Most Popular</div>
+              <div class="card-icon">💼</div>
+              <h3>Investor Login</h3>
+              <p>Sign up, get tokens & invest in the most promising startups</p>
+              <div class="card-actions">
+                <button class="btn-card" onclick="showModal('audience-login')">Sign In</button>
+                <button class="btn-card-outline" onclick="showModal('audience-signup')">Register</button>
+              </div>
+            </div>
+
+            <!-- Admin Card -->
+            <div class="login-card" id="card-admin">
+              <div class="card-icon">⚡</div>
+              <h3>Admin Panel</h3>
+              <p>Manage rounds, teams, tokens and the entire event flow</p>
+              <button class="btn-card" onclick="showModal('admin-login')">Admin Access</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-strip">
+          <div class="stat-item">
+            <span class="stat-num" id="stat-teams">0</span>
+            <span class="stat-label">Teams</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-investors">0</span>
+            <span class="stat-label">Investors</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-tokens">0</span>
+            <span class="stat-label">Tokens Circulating</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-round">—</span>
+            <span class="stat-label">Current Round</span>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Team Dashboard Page -->
+    <div id="page-team" class="page">
+      <div id="team-dashboard-root"></div>
+    </div>
+
+    <!-- Audience Dashboard Page -->
+    <div id="page-audience" class="page">
+      <div id="audience-dashboard-root"></div>
+    </div>
+
+    <!-- Admin Page -->
+    <div id="page-admin" class="page">
+      <div id="admin-dashboard-root"></div>
+    </div>
+  </div>
+
+  <!-- ===== MODALS ===== -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/team-dashboard.js"></script>
+  <script src="js/audience-dashboard.js"></script>
+  <script src="js/admin-dashboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
