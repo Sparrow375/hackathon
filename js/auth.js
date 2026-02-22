@@ -6,11 +6,18 @@ import {
   getGlobalStats
 } from './data.js';
 import {
+  db,
   auth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  getDocs,
+  query,
+  where,
+  collection,
+  setPersistence,
+  browserSessionPersistence
 } from './firebase-config.js';
 
 // ===== AUTH MODULE =====
@@ -25,7 +32,13 @@ let isAdmin = false;
 
 // Initialize Auth Listener
 function initAuth() {
+  // Set persistence to SESSION so tabs don't sync logins
+  setPersistence(auth, browserSessionPersistence).catch(e => console.error(e));
+
   onAuthStateChanged(auth, async (user) => {
+
+    const loader = document.getElementById('global-loader');
+
     if (user) {
       const email = user.email || '';
       console.log("Persistent session detected:", email);
@@ -33,41 +46,47 @@ function initAuth() {
       try {
         if (email.endsWith(INTERNAL_DOMAIN_USER)) {
           const hallTicket = email.split('@')[0];
-          const dbUser = getUserByHallTicket(hallTicket);
+          let dbUser = getUserByHallTicket(hallTicket);
+
+          if (!dbUser) {
+            // Fetch directly from Firestore to skip localDB sync delay
+            const q = query(collection(db, 'users'), where('hallTicket', '==', hallTicket));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              dbUser = { id: snap.docs[0].id, ...snap.docs[0].data() };
+            }
+          }
+
           if (dbUser) {
             currentUser = dbUser;
             showPage('audience');
             if (typeof window.renderAudienceDashboard === 'function') window.renderAudienceDashboard(currentUser);
           } else {
-            // Wait for data sync or logout if not found
-            setTimeout(() => {
-              const retryUser = getUserByHallTicket(hallTicket);
-              if (retryUser) {
-                currentUser = retryUser;
-                showPage('audience');
-                if (typeof window.renderAudienceDashboard === 'function') window.renderAudienceDashboard(currentUser);
-              }
-            }, 1000);
+            console.warn("User session found but data missing in DB.");
+            await signOut(auth);
+            showPage('landing');
           }
         }
         else if (email.endsWith(INTERNAL_DOMAIN_TEAM)) {
           const username = email.split('@')[0];
-          const teams = getTeams();
-          const team = teams.find(t => t.username === username);
+          let team = getTeams().find(t => t.username === username);
+
+          if (!team) {
+            const q = query(collection(db, 'teams'), where('username', '==', username));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              team = { id: snap.docs[0].id, ...snap.docs[0].data() };
+            }
+          }
+
           if (team) {
             currentTeam = team;
             showPage('team');
             if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(team);
           } else {
-            // Wait for data sync
-            setTimeout(() => {
-              const retryTeam = getTeams().find(t => t.username === username);
-              if (retryTeam) {
-                currentTeam = retryTeam;
-                showPage('team');
-                if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(retryTeam);
-              }
-            }, 1000);
+            console.warn("Team session found but data missing in DB.");
+            await signOut(auth);
+            showPage('landing');
           }
         }
         else if (email.endsWith(INTERNAL_DOMAIN_ADMIN)) {
@@ -77,13 +96,17 @@ function initAuth() {
         }
       } catch (err) {
         console.error("Auth restoration error:", err);
+        showPage('landing');
       }
     } else {
       console.log("No active session.");
-      // If we were on a dashboard, go back to landing
-      if (!document.getElementById('page-landing').classList.contains('active')) {
-        showPage('landing');
-      }
+      showPage('landing');
+    }
+
+    // Hide loader
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.style.display = 'none', 500);
     }
   });
 }
@@ -154,7 +177,11 @@ async function loginAsTeam() {
     if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(team);
     showToast(`Welcome back, ${team.name}! 🚀`, 'success');
   } catch (error) {
-    console.error("Team login error:", error);
+    console.error("DEBUG - Team login error details:", {
+      code: error.code,
+      message: error.message,
+      fullError: error
+    });
     // If user doesn't exist in Auth but exists in DB, try to create it
     if (error.code === 'auth/user-not-found') {
       try {
@@ -276,8 +303,8 @@ async function registerAudience() {
     showToast('Passwords do not match', 'error');
     return;
   }
-  if (password.length < 4) {
-    showToast('Password must be at least 4 characters', 'error');
+  if (password.length < 6) {
+    showToast('Password must be at least 6 characters (Firebase requirement)', 'error');
     return;
   }
 
@@ -334,13 +361,23 @@ async function loginAsAdmin() {
     if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
     showToast('Admin access granted ⚡', 'success');
   } catch (error) {
-    if (error.code === 'auth/user-not-found') {
+    console.error("Admin login error:", error);
+    // If admin auth user doesn't exist, create it once using the predefined password
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
       try {
         await createUserWithEmailAndPassword(auth, `admin@${INTERNAL_DOMAIN_ADMIN}`, password);
-        loginAsAdmin();
-      } catch (e) { console.error(e); }
+        // If creation succeeds, they are automatically signed in by Firebase
+        isAdmin = true;
+        closeModal();
+        showPage('admin');
+        if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+        showToast('Admin account initialized & access granted ⚡', 'success');
+      } catch (createError) {
+        console.error("Admin auto-creation failed:", createError);
+        showToast('Admin Access Failed: ' + createError.message, 'error');
+      }
     } else {
-      showToast('Admin login failed', 'error');
+      showToast('Admin login failed: ' + error.message, 'error');
     }
   }
 }
@@ -415,11 +452,12 @@ window.logout = logout;
 window.showPage = showPage;
 window.showToast = showToast;
 window.updateLandingStats = updateLandingStats;
+window.getAuthUser = () => currentUser;
+window.getAuthTeam = () => currentTeam;
+window.getIsAdmin = () => isAdmin;
 
 export {
   currentUser, currentTeam, isAdmin,
   showModal, closeModal, loginAsTeam, loginAsAudience, registerAudience,
   loginAsAdmin, logout, showPage, showToast, updateLandingStats
 };
-
-

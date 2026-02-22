@@ -71,6 +71,29 @@ function updateUI() {
   if (typeof window.updateLandingStats === 'function') {
     window.updateLandingStats();
   }
+
+  // Real-time Dashboard Updates
+  // If User is logged in, refresh their view
+  if (typeof window.getAuthUser === 'function' && window.getAuthUser()) {
+    if (typeof window.renderAudienceDashboard === 'function') {
+      window.renderAudienceDashboard(window.getAuthUser());
+    }
+  }
+
+  // If Team is logged in, refresh their view
+  if (typeof window.getAuthTeam === 'function' && window.getAuthTeam()) {
+    if (typeof window.renderTeamDashboard === 'function') {
+      const team = localDB.teams.find(t => t.id === window.getAuthTeam().id);
+      if (team) window.renderTeamDashboard(team);
+    }
+  }
+
+  // If Admin is logged in, refresh their view
+  if (typeof window.getIsAdmin === 'function' && window.getIsAdmin()) {
+    if (typeof window.renderAdminDashboard === 'function') {
+      window.renderAdminDashboard();
+    }
+  }
 }
 
 

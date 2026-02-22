@@ -43,7 +43,9 @@ export {
     createUserWithEmailAndPassword,
     signOut,
     onAuthStateChanged,
-    GoogleAuthProvider
+    GoogleAuthProvider,
+    setPersistence,
+    browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
 

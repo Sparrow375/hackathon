@@ -15,9 +15,27 @@
 </head>
 
 <body>
+  <!-- Global Loading Screen -->
+  <div id="global-loader"
+    style="position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s ease;">
+    <div style="font-size:3rem;margin-bottom:20px">🚀</div>
+    <div
+      style="width:40px;height:40px;border:3px solid var(--accent-primary);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite">
+    </div>
+    <p style="margin-top:20px;color:var(--text-secondary);font-weight:500;letter-spacing:1px">INITIALIZING ARENA...</p>
+    <style>
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </div>
+
   <div id="app">
     <!-- Landing Page -->
-    <div id="page-landing" class="page active">
+    <div id="page-landing" class="page">
+
       <div class="landing-bg">
         <div class="orb orb-1"></div>
         <div class="orb orb-2"></div>
