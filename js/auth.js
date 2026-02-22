@@ -5,12 +5,88 @@ import {
   createUser,
   getGlobalStats
 } from './data.js';
+import {
+  auth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from './firebase-config.js';
 
 // ===== AUTH MODULE =====
 const ADMIN_PASSWORD = 'avaneesh2006';
+const INTERNAL_DOMAIN_USER = 'user.internal';
+const INTERNAL_DOMAIN_TEAM = 'team.internal';
+const INTERNAL_DOMAIN_ADMIN = 'admin.internal';
+
 let currentUser = null;
 let currentTeam = null;
 let isAdmin = false;
+
+// Initialize Auth Listener
+function initAuth() {
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const email = user.email || '';
+      console.log("Persistent session detected:", email);
+
+      try {
+        if (email.endsWith(INTERNAL_DOMAIN_USER)) {
+          const hallTicket = email.split('@')[0];
+          const dbUser = getUserByHallTicket(hallTicket);
+          if (dbUser) {
+            currentUser = dbUser;
+            showPage('audience');
+            if (typeof window.renderAudienceDashboard === 'function') window.renderAudienceDashboard(currentUser);
+          } else {
+            // Wait for data sync or logout if not found
+            setTimeout(() => {
+              const retryUser = getUserByHallTicket(hallTicket);
+              if (retryUser) {
+                currentUser = retryUser;
+                showPage('audience');
+                if (typeof window.renderAudienceDashboard === 'function') window.renderAudienceDashboard(currentUser);
+              }
+            }, 1000);
+          }
+        }
+        else if (email.endsWith(INTERNAL_DOMAIN_TEAM)) {
+          const username = email.split('@')[0];
+          const teams = getTeams();
+          const team = teams.find(t => t.username === username);
+          if (team) {
+            currentTeam = team;
+            showPage('team');
+            if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(team);
+          } else {
+            // Wait for data sync
+            setTimeout(() => {
+              const retryTeam = getTeams().find(t => t.username === username);
+              if (retryTeam) {
+                currentTeam = retryTeam;
+                showPage('team');
+                if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(retryTeam);
+              }
+            }, 1000);
+          }
+        }
+        else if (email.endsWith(INTERNAL_DOMAIN_ADMIN)) {
+          isAdmin = true;
+          showPage('admin');
+          if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+        }
+      } catch (err) {
+        console.error("Auth restoration error:", err);
+      }
+    } else {
+      console.log("No active session.");
+      // If we were on a dashboard, go back to landing
+      if (!document.getElementById('page-landing').classList.contains('active')) {
+        showPage('landing');
+      }
+    }
+  });
+}
 
 function showModal(type) {
   const overlay = document.getElementById('modal-overlay');
@@ -54,11 +130,12 @@ function renderTeamLoginForm() {
   `;
 }
 
-function loginAsTeam() {
+async function loginAsTeam() {
   const username = document.getElementById('team-username').value.trim();
   const password = document.getElementById('team-password').value;
   const teams = getTeams();
   const team = teams.find(t => t.username === username && t.password === password);
+
   if (!team) {
     showToast('Invalid team credentials', 'error');
     return;
@@ -67,11 +144,29 @@ function loginAsTeam() {
     showToast('This team account is inactive', 'error');
     return;
   }
-  currentTeam = team;
-  closeModal();
-  showPage('team');
-  if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(team);
-  showToast(`Welcome back, ${team.name}! 🚀`, 'success');
+
+  try {
+    const email = `${username}@${INTERNAL_DOMAIN_TEAM}`;
+    await signInWithEmailAndPassword(auth, email, password);
+    currentTeam = team;
+    closeModal();
+    showPage('team');
+    if (typeof window.renderTeamDashboard === 'function') window.renderTeamDashboard(team);
+    showToast(`Welcome back, ${team.name}! 🚀`, 'success');
+  } catch (error) {
+    console.error("Team login error:", error);
+    // If user doesn't exist in Auth but exists in DB, try to create it
+    if (error.code === 'auth/user-not-found') {
+      try {
+        await createUserWithEmailAndPassword(auth, `${username}@${INTERNAL_DOMAIN_TEAM}`, password);
+        loginAsTeam(); // Retry login
+      } catch (e) {
+        showToast('Login failed. Please contact admin.', 'error');
+      }
+    } else {
+      showToast('Login failed: ' + error.message, 'error');
+    }
+  }
 }
 
 // ===== AUDIENCE LOGIN =====
@@ -94,19 +189,37 @@ function renderAudienceLoginForm() {
   `;
 }
 
-function loginAsAudience() {
+async function loginAsAudience() {
   const hallTicket = document.getElementById('aud-hallticket').value.trim().toUpperCase();
   const password = document.getElementById('aud-password').value;
   const user = getUserByHallTicket(hallTicket);
+
   if (!user || user.password !== password) {
     showToast('Invalid credentials', 'error');
     return;
   }
-  currentUser = getUserById(user.id); // fresh from DB
-  closeModal();
-  showPage('audience');
-  if (typeof window.renderAudienceDashboard === 'function') window.renderAudienceDashboard(currentUser);
-  showToast(`Welcome, ${user.name}! 💼`, 'success');
+
+  try {
+    const email = `${hallTicket}@${INTERNAL_DOMAIN_USER}`;
+    await signInWithEmailAndPassword(auth, email, password);
+    currentUser = getUserById(user.id);
+    closeModal();
+    showPage('audience');
+    if (typeof window.renderAudienceDashboard === 'function') window.renderAudienceDashboard(currentUser);
+    showToast(`Welcome, ${user.name}! 💼`, 'success');
+  } catch (error) {
+    console.error("Audience login error:", error);
+    if (error.code === 'auth/user-not-found') {
+      try {
+        await createUserWithEmailAndPassword(auth, `${hallTicket}@${INTERNAL_DOMAIN_USER}`, password);
+        loginAsAudience();
+      } catch (e) {
+        showToast('Login failed. Please register again.', 'error');
+      }
+    } else {
+      showToast('Login failed: ' + error.message, 'error');
+    }
+  }
 }
 
 // ===== AUDIENCE SIGNUP =====
@@ -169,11 +282,16 @@ async function registerAudience() {
   }
 
   try {
+    // 1. Create in Firestore
     const result = await createUser(hallTicket, password, name, college, section);
     if (result.error) {
       showToast(result.error, 'error');
       return;
     }
+
+    // 2. Create in Firebase Auth for persistence
+    const email = `${hallTicket}@${INTERNAL_DOMAIN_USER}`;
+    await createUserWithEmailAndPassword(auth, email, password);
 
     currentUser = result;
     closeModal();
@@ -182,10 +300,9 @@ async function registerAudience() {
     showToast(`Welcome to the arena, ${name}! 🎉`, 'success');
   } catch (error) {
     console.error("Registration error:", error);
-    showToast('Registration failed. Please check your connection or try again.', 'error');
+    showToast('Registration failed: ' + error.message, 'error');
   }
 }
-
 
 // ===== ADMIN LOGIN =====
 function renderAdminLoginForm() {
@@ -201,27 +318,46 @@ function renderAdminLoginForm() {
   `;
 }
 
-function loginAsAdmin() {
+async function loginAsAdmin() {
   const password = document.getElementById('admin-password').value;
   if (password !== ADMIN_PASSWORD) {
     showToast('Incorrect admin password', 'error');
     return;
   }
-  isAdmin = true;
-  closeModal();
-  showPage('admin');
-  if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
-  showToast('Admin access granted ⚡', 'success');
+
+  try {
+    const email = `admin@${INTERNAL_DOMAIN_ADMIN}`;
+    await signInWithEmailAndPassword(auth, email, password);
+    isAdmin = true;
+    closeModal();
+    showPage('admin');
+    if (typeof window.renderAdminDashboard === 'function') window.renderAdminDashboard();
+    showToast('Admin access granted ⚡', 'success');
+  } catch (error) {
+    if (error.code === 'auth/user-not-found') {
+      try {
+        await createUserWithEmailAndPassword(auth, `admin@${INTERNAL_DOMAIN_ADMIN}`, password);
+        loginAsAdmin();
+      } catch (e) { console.error(e); }
+    } else {
+      showToast('Admin login failed', 'error');
+    }
+  }
 }
 
 // ===== LOGOUT =====
-function logout() {
-  currentUser = null;
-  currentTeam = null;
-  isAdmin = false;
-  showPage('landing');
-  updateLandingStats();
-  showToast('Logged out successfully', 'info');
+async function logout() {
+  try {
+    await signOut(auth);
+    currentUser = null;
+    currentTeam = null;
+    isAdmin = false;
+    showPage('landing');
+    updateLandingStats();
+    showToast('Logged out successfully', 'info');
+  } catch (err) {
+    console.error("Logout error:", err);
+  }
 }
 
 // ===== PAGE NAVIGATION =====
@@ -265,6 +401,9 @@ function updateLandingStats() {
   }
 }
 
+// Kick off listener
+initAuth();
+
 // Attach to window
 window.showModal = showModal;
 window.closeModal = closeModal;
@@ -282,4 +421,5 @@ export {
   showModal, closeModal, loginAsTeam, loginAsAudience, registerAudience,
   loginAsAdmin, logout, showPage, showToast, updateLandingStats
 };
+
 
