@@ -1,15 +1,31 @@
-// ===== ADMIN DASHBOARD =====
+import {
+  getDB,
+  getCurrentRound,
+  getTeams,
+  getUsers,
+  startRound,
+  endRound,
+  createTeam,
+  deleteTeam,
+  updateTeam,
+  mergeTeams,
+  adjustTeamTokens,
+  getTeamById,
+  resetDB
+} from './data.js';
+import { logout, showToast } from './auth.js';
 
+// ===== ADMIN DASHBOARD =====
 let adminTab = 'overview';
 
 function renderAdminDashboard() {
-    const root = document.getElementById('admin-dashboard-root');
-    const db = getDB();
-    const round = getCurrentRound();
-    const teams = getTeams();
-    const users = getUsers();
+  const root = document.getElementById('admin-dashboard-root');
+  const db = getDB();
+  const round = getCurrentRound();
+  const teams = getTeams();
+  const users = getUsers();
 
-    root.innerHTML = `
+  root.innerHTML = `
     <div class="dashboard">
       <nav class="dash-nav">
         <div class="dash-logo">
@@ -76,15 +92,15 @@ function renderAdminDashboard() {
 }
 
 function renderAdminOverview(db, round, teams, users) {
-    const totalInvestments = db.investments.length;
-    const totalTokensInCirculation = teams.reduce((s, t) => s + t.currentTokens, 0) +
-        users.reduce((s, u) => s + u.tokens, 0);
-    const topTeam = teams.filter(t => t.isActive).sort((a, b) => b.totalRevenue - a.totalRevenue)[0];
+  const totalInvestments = db.investments.length;
+  const totalTokensInCirculation = teams.reduce((s, t) => s + (t.currentTokens || 0), 0) +
+    users.reduce((s, u) => s + (u.tokens || 0), 0);
+  const topTeam = teams.filter(t => t.isActive).sort((a, b) => (b.totalRevenue || 0) - (a.totalRevenue || 0))[0];
 
-    // Revenue chart for all teams
-    const activeTeams = teams.filter(t => t.isActive);
+  // Revenue chart for all teams
+  const activeTeams = teams.filter(t => t.isActive);
 
-    return `
+  return `
     <div class="metrics-grid">
       <div class="metric-card purple">
         <div class="metric-icon">🏢</div>
@@ -132,10 +148,10 @@ function renderAdminOverview(db, round, teams, users) {
         <div class="chart-title">Team Revenue Comparison</div>
         <div class="bar-chart">
           ${activeTeams.map(t => {
-        const maxRev = Math.max(...activeTeams.map(x => x.totalRevenue), 1);
-        return `<div class="bar" style="height:${Math.max(4, (t.totalRevenue / maxRev) * 100)}%"
-              data-value="${t.name}: ${t.totalRevenue} tokens"></div>`;
-    }).join('')}
+    const maxRev = Math.max(...activeTeams.map(x => (x.totalRevenue || 0)), 1);
+    return `<div class="bar" style="height:${Math.max(4, ((t.totalRevenue || 0) / maxRev) * 100)}%"
+              data-value="${t.name}: ${t.totalRevenue || 0} tokens"></div>`;
+  }).join('')}
         </div>
         <div class="bar-labels">
           ${activeTeams.map(t => `<div class="bar-label">${t.emoji}</div>`).join('')}
@@ -152,14 +168,14 @@ function renderAdminOverview(db, round, teams, users) {
             <tr><th>#</th><th>Team</th><th>Current Tokens</th><th>Total Revenue</th><th>Investors</th><th>Price</th></tr>
           </thead>
           <tbody>
-            ${activeTeams.sort((a, b) => b.totalRevenue - a.totalRevenue).map((t, i) => `
+            ${activeTeams.sort((a, b) => (b.totalRevenue || 0) - (a.totalRevenue || 0)).map((t, i) => `
               <tr>
                 <td>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</td>
                 <td>${t.emoji} ${t.name}</td>
-                <td><span style="color:#a78bfa;font-weight:700">🪙 ${t.currentTokens}</span></td>
-                <td><span style="color:#fbbf24;font-weight:700">🪙 ${t.totalRevenue}</span></td>
-                <td>${t.investorCount}</td>
-                <td>${t.basePrice}</td>
+                <td><span style="color:#a78bfa;font-weight:700">🪙 ${t.currentTokens || 0}</span></td>
+                <td><span style="color:#fbbf24;font-weight:700">🪙 ${t.totalRevenue || 0}</span></td>
+                <td>${t.investorCount || 0}</td>
+                <td>${t.basePrice || 0}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -170,7 +186,7 @@ function renderAdminOverview(db, round, teams, users) {
 }
 
 function renderAdminRounds(round, db) {
-    return `
+  return `
     <div class="form-section">
       <div class="form-section-title">🎯 Round Controls</div>
       <div class="round-controls">
@@ -222,7 +238,7 @@ function renderAdminRounds(round, db) {
 }
 
 function renderAdminTeams(teams) {
-    return `
+  return `
     <div class="form-section">
       <div class="form-section-title">➕ Create New Team</div>
       <div class="form-row">
@@ -285,7 +301,7 @@ function renderAdminTeams(teams) {
         </thead>
         <tbody>
           ${teams.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No teams yet</td></tr>' :
-            teams.map(t => `
+      teams.map(t => `
               <tr>
                 <td>${t.emoji} ${t.name}</td>
                 <td><code style="color:var(--text-muted)">${t.username}</code></td>
@@ -295,8 +311,8 @@ function renderAdminTeams(teams) {
                   </span>
                   ${t.mergedWith ? '<span class="merged-badge" style="margin-left:4px">Merged</span>' : ''}
                 </td>
-                <td style="color:#fbbf24;font-weight:700">🪙 ${t.totalRevenue}</td>
-                <td>${t.investorCount}</td>
+                <td style="color:#fbbf24;font-weight:700">🪙 ${t.totalRevenue || 0}</td>
+                <td>${t.investorCount || 0}</td>
                 <td>
                   <button class="btn-danger btn-sm" onclick="adminDeleteTeam('${t.id}')">Delete</button>
                   ${!t.isActive ? `<button class="btn-success btn-sm" style="margin-left:6px" onclick="adminReactivateTeam('${t.id}')">Reactivate</button>` : ''}
@@ -310,7 +326,7 @@ function renderAdminTeams(teams) {
 }
 
 function renderAdminInvestors(users) {
-    return `
+  return `
     <div class="card">
       <div class="section-header">
         <div class="section-title">👥 Registered Investors</div>
@@ -334,9 +350,9 @@ function renderAdminInvestors(users) {
                 <td><code style="color:var(--text-muted)">${u.hallTicket}</code></td>
                 <td>${u.college}</td>
                 <td>${u.section}</td>
-                <td style="color:#fbbf24;font-weight:700">🪙 ${u.tokens}</td>
-                <td>${u.investments.length}</td>
-                <td>${u.roundsParticipated.length}</td>
+                <td style="color:#fbbf24;font-weight:700">🪙 ${u.tokens || 0}</td>
+                <td>${(u.investments || []).length}</td>
+                <td>${(u.roundsParticipated || []).length}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -347,7 +363,7 @@ function renderAdminInvestors(users) {
 }
 
 function renderAdminTokens(teams) {
-    return `
+  return `
     <div class="card" style="margin-bottom:20px">
       <div class="section-header">
         <div class="section-title">🪙 Adjust Team Tokens</div>
@@ -367,8 +383,8 @@ function renderAdminTokens(teams) {
             ${teams.filter(t => t.isActive).map(t => `
               <tr>
                 <td>${t.emoji} ${t.name}</td>
-                <td style="color:#a78bfa;font-weight:700">🪙 ${t.currentTokens}</td>
-                <td style="color:#fbbf24;font-weight:700">🪙 ${t.totalRevenue}</td>
+                <td style="color:#a78bfa;font-weight:700">🪙 ${t.currentTokens || 0}</td>
+                <td style="color:#fbbf24;font-weight:700">🪙 ${t.totalRevenue || 0}</td>
                 <td>
                   <div class="token-adjust">
                     <input type="number" id="adj-${t.id}" placeholder="Amount" min="1" style="width:90px;padding:6px 10px" />
@@ -384,38 +400,39 @@ function renderAdminTokens(teams) {
     </div>
 
     <!-- Revenue Charts per Team -->
-    ${teams.filter(t => t.isActive && t.revenueHistory.length > 0).map(t => {
-        const maxRev = Math.max(...t.revenueHistory.map(h => h.amount), 1);
-        return `
+    ${teams.filter(t => t.isActive && (t.revenueHistory || []).length > 0).map(t => {
+    const history = t.revenueHistory || [];
+    const maxRev = Math.max(...history.map(h => h.amount), 1);
+    return `
         <div class="chart-container">
           <div class="chart-title">${t.emoji} ${t.name} — Revenue per Round</div>
           <div class="bar-chart">
-            ${t.revenueHistory.map(h => `
+            ${history.map(h => `
               <div class="bar" style="height:${Math.max(4, (h.amount / maxRev) * 100)}%"
                 data-value="Round ${h.round}: ${h.amount} tokens"></div>
             `).join('')}
           </div>
           <div class="bar-labels">
-            ${t.revenueHistory.map(h => `<div class="bar-label">R${h.round}</div>`).join('')}
+            ${history.map(h => `<div class="bar-label">R${h.round}</div>`).join('')}
           </div>
         </div>
       `;
-    }).join('')}
+  }).join('')}
   `;
 }
 
 function renderAdminDanger() {
-    return `
+  return `
     <div class="danger-zone">
       <div class="danger-zone-title">⚠️ Danger Zone</div>
       <p>These actions are irreversible. Please be absolutely sure before proceeding.</p>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <button class="btn-danger" onclick="adminReset()">
-          🔄 Reset Everything
+            🔄 Reset Everything
         </button>
       </div>
       <div style="margin-top:16px;font-size:0.8rem;color:var(--text-muted)">
-        Reset will delete all teams, users, investments, and rounds. The admin password will remain.
+        Reset will delete all teams, users, investments, and rounds.
       </div>
     </div>
   `;
@@ -423,95 +440,111 @@ function renderAdminDanger() {
 
 // ===== ADMIN ACTIONS =====
 function switchAdminTab(tab, btn) {
-    adminTab = tab;
-    document.querySelectorAll('#page-admin .tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#page-admin .tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('admin-tab-' + tab).classList.add('active');
+  adminTab = tab;
+  document.querySelectorAll('#page-admin .tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#page-admin .tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('admin-tab-' + tab).classList.add('active');
 }
 
-function adminStartRound() {
-    const round = startRound();
-    showToast(`🔴 Round ${round.number} is now LIVE! Investors get 🪙 100 tokens`, 'success');
-    renderAdminDashboard();
+async function adminStartRound() {
+  const round = await startRound();
+  showToast(`🔴 Round ${round.number} is now LIVE! Investors get 🪙 100 tokens`, 'success');
+  renderAdminDashboard();
 }
 
-function adminEndRound() {
-    const round = endRound();
-    showToast(`⏹️ Round ${round.number} ended`, 'info');
-    renderAdminDashboard();
+async function adminEndRound() {
+  const round = await endRound();
+  showToast(`⏹️ Round ${round.number} ended`, 'info');
+  renderAdminDashboard();
 }
 
-function adminCreateTeam() {
-    const name = document.getElementById('new-team-name').value.trim();
-    const emoji = document.getElementById('new-team-emoji').value.trim() || '🚀';
-    const username = document.getElementById('new-team-username').value.trim().toLowerCase();
-    const password = document.getElementById('new-team-password').value.trim();
+async function adminCreateTeam() {
+  const name = document.getElementById('new-team-name').value.trim();
+  const emoji = document.getElementById('new-team-emoji').value.trim() || '🚀';
+  const username = document.getElementById('new-team-username').value.trim().toLowerCase();
+  const password = document.getElementById('new-team-password').value.trim();
 
-    if (!name || !username || !password) {
-        showToast('Please fill in all team fields', 'error');
-        return;
-    }
+  if (!name || !username || !password) {
+    showToast('Please fill in all team fields', 'error');
+    return;
+  }
 
-    // Check username uniqueness
-    const existing = getTeams().find(t => t.username === username);
-    if (existing) {
-        showToast('Username already taken', 'error');
-        return;
-    }
+  // Check username uniqueness
+  const existing = getTeams().find(t => t.username === username);
+  if (existing) {
+    showToast('Username already taken', 'error');
+    return;
+  }
 
-    const team = createTeam(name, username, password, emoji);
-    showToast(`Team "${name}" created! 🎉`, 'success');
-    renderAdminDashboard();
+  await createTeam(name, username, password, emoji);
+  showToast(`Team "${name}" created! 🎉`, 'success');
+  renderAdminDashboard();
 }
 
-function adminDeleteTeam(teamId) {
-    const team = getTeamById(teamId);
-    if (!confirm(`Delete team "${team.name}"? This cannot be undone.`)) return;
-    deleteTeam(teamId);
-    showToast(`Team deleted`, 'info');
-    renderAdminDashboard();
+async function adminDeleteTeam(teamId) {
+  const team = getTeamById(teamId);
+  if (!confirm(`Delete team "${team.name}"? This cannot be undone.`)) return;
+  await deleteTeam(teamId);
+  showToast(`Team deleted`, 'info');
+  renderAdminDashboard();
 }
 
-function adminReactivateTeam(teamId) {
-    updateTeam(teamId, { isActive: true, mergedWith: null });
-    showToast('Team reactivated', 'success');
-    renderAdminDashboard();
+async function adminReactivateTeam(teamId) {
+  await updateTeam(teamId, { isActive: true, mergedWith: null });
+  showToast('Team reactivated', 'success');
+  renderAdminDashboard();
 }
 
-function adminMergeTeams() {
-    const id1 = document.getElementById('merge-team-1').value;
-    const id2 = document.getElementById('merge-team-2').value;
-    if (!id1 || !id2) { showToast('Select both teams', 'error'); return; }
-    if (id1 === id2) { showToast('Cannot merge a team with itself', 'error'); return; }
-    const t1 = getTeamById(id1);
-    const t2 = getTeamById(id2);
-    if (!confirm(`Merge "${t1.name}" and "${t2.name}"? "${t2.name}" will be deactivated.`)) return;
-    const merged = mergeTeams(id1, id2);
-    showToast(`🤝 Teams merged into "${merged.name}"!`, 'success');
-    renderAdminDashboard();
+async function adminMergeTeams() {
+  const id1 = document.getElementById('merge-team-1').value;
+  const id2 = document.getElementById('merge-team-2').value;
+  if (!id1 || !id2) { showToast('Select both teams', 'error'); return; }
+  if (id1 === id2) { showToast('Cannot merge a team with itself', 'error'); return; }
+  const t1 = getTeamById(id1);
+  const t2 = getTeamById(id2);
+  if (!confirm(`Merge "${t1.name}" and "${t2.name}"? "${t2.name}" will be deactivated.`)) return;
+  const merged = await mergeTeams(id1, id2);
+  showToast(`🤝 Teams merged into "${merged.name}"!`, 'success');
+  renderAdminDashboard();
 }
 
-function adminAdjustTokens(teamId, type) {
-    const amount = parseInt(document.getElementById('adj-' + teamId).value);
-    if (isNaN(amount) || amount <= 0) {
-        showToast('Enter a valid amount', 'error');
-        return;
-    }
-    const team = adjustTeamTokens(teamId, amount, type);
-    showToast(`${type === 'add' ? 'Added' : 'Removed'} 🪙 ${amount} ${type === 'add' ? 'to' : 'from'} ${team.name}`, 'success');
-    renderAdminDashboard();
+async function adminAdjustTokens(teamId, type) {
+  const amount = parseInt(document.getElementById('adj-' + teamId).value);
+  if (isNaN(amount) || amount <= 0) {
+    showToast('Enter a valid amount', 'error');
+    return;
+  }
+  const team = getTeamById(teamId);
+  await adjustTeamTokens(teamId, amount, type);
+  showToast(`${type === 'add' ? 'Added' : 'Removed'} 🪙 ${amount} ${type === 'add' ? 'to' : 'from'} ${team.name}`, 'success');
+  renderAdminDashboard();
 }
 
-function adminReset() {
-    if (!confirm('⚠️ RESET EVERYTHING? This will delete ALL data including teams, users, investments and rounds. This CANNOT be undone!')) return;
-    if (!confirm('Are you absolutely sure? Type "yes" in the next prompt.')) return;
-    const confirmation = prompt('Type "reset" to confirm:');
-    if (confirmation !== 'reset') {
-        showToast('Reset cancelled', 'info');
-        return;
-    }
-    resetDB();
-    showToast('🔄 Everything has been reset', 'warning');
-    renderAdminDashboard();
+async function adminReset() {
+  if (!confirm('⚠️ RESET EVERYTHING? This will delete ALL data including teams, users, investments and rounds. This CANNOT be undone!')) return;
+  if (!confirm('Are you absolutely sure? Type "yes" in the next prompt.')) return;
+  const confirmation = prompt('Type "reset" to confirm:');
+  if (confirmation !== 'reset') {
+    showToast('Reset cancelled', 'info');
+    return;
+  }
+  await resetDB();
+  showToast('🔄 Everything has been reset', 'warning');
+  renderAdminDashboard();
 }
+
+// Attach to window
+window.renderAdminDashboard = renderAdminDashboard;
+window.switchAdminTab = switchAdminTab;
+window.adminStartRound = adminStartRound;
+window.adminEndRound = adminEndRound;
+window.adminCreateTeam = adminCreateTeam;
+window.adminDeleteTeam = adminDeleteTeam;
+window.adminReactivateTeam = adminReactivateTeam;
+window.adminMergeTeams = adminMergeTeams;
+window.adminAdjustTokens = adminAdjustTokens;
+window.adminReset = adminReset;
+
+export { renderAdminDashboard };
+

@@ -1,15 +1,28 @@
-// ===== DATA LAYER =====
-// All data is stored in localStorage under 'pitchitup_data'
+import {
+  db,
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  setDoc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+  increment
+} from './firebase-config.js';
 
-const DB_KEY = 'pitchitup_data';
-
-const DEFAULT_DATA = {
+// ===== DATA LAYER (Firestore) =====
+let localDB = {
   teams: [],
   users: [],
   rounds: [],
-  currentRound: null, // { number, status: 'live'|'ended', startedAt }
+  currentRound: null,
   roundCount: 0,
-  investments: [], // { userId, teamId, amount, round, timestamp }
+  investments: [],
   settings: {
     tokensPerRound: 100,
     minPrice: 30,
@@ -19,41 +32,77 @@ const DEFAULT_DATA = {
   adminLog: [],
 };
 
-function getDB() {
-  try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_DATA));
-    const data = JSON.parse(raw);
-    // Merge with defaults to handle new fields
-    return { ...JSON.parse(JSON.stringify(DEFAULT_DATA)), ...data };
-  } catch (e) {
-    return JSON.parse(JSON.stringify(DEFAULT_DATA));
+// Initialize listeners to keep localDB in sync
+function initDataSync() {
+  onSnapshot(collection(db, 'teams'), (snapshot) => {
+    localDB.teams = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    updateUI();
+  }, (err) => console.error("Teams sync error:", err));
+
+  onSnapshot(collection(db, 'users'), (snapshot) => {
+    localDB.users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    updateUI();
+  }, (err) => console.error("Users sync error:", err));
+
+  onSnapshot(collection(db, 'rounds'), (snapshot) => {
+    localDB.rounds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const active = localDB.rounds.find(r => r.status === 'live');
+    localDB.currentRound = active || (localDB.rounds.length > 0 ? localDB.rounds[localDB.rounds.length - 1] : null);
+    localDB.roundCount = localDB.rounds.length;
+    updateUI();
+  }, (err) => console.error("Rounds sync error:", err));
+
+  onSnapshot(collection(db, 'investments'), (snapshot) => {
+    localDB.investments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    updateUI();
+  }, (err) => console.error("Investments sync error:", err));
+
+  onSnapshot(doc(db, 'settings', 'global'), (doc) => {
+    if (doc.exists()) {
+      localDB.settings = doc.data();
+    } else {
+      setDoc(doc.ref, localDB.settings).catch(e => console.error("Error setting initial settings:", e));
+    }
+    updateUI();
+  }, (err) => console.error("Settings sync error:", err));
+}
+
+function updateUI() {
+  if (typeof window.updateLandingStats === 'function') {
+    window.updateLandingStats();
   }
 }
 
-function saveDB(data) {
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
+
+// Data Sync will be initialized at the bottom of the file after exports
+
+function getDB() {
+  return localDB;
+}
+
+// For compatibility with existing code
+async function saveDB(data) {
+  // In Firestore, we don't save the whole DB. 
+  // We'll update the specific parts in the operation functions.
+  console.log('saveDB called - refactoring to granular writes');
 }
 
 function resetDB() {
-  localStorage.removeItem(DB_KEY);
-  return getDB();
+  // This would be destructive in Firestore, maybe skip for now or just clear collections
+  console.warn('resetDB called - destructive operation skipped');
 }
 
 // ===== TEAM OPERATIONS =====
 function getTeams() {
-  return getDB().teams;
+  return localDB.teams;
 }
 
 function getTeamById(id) {
-  return getDB().teams.find(t => t.id === id);
+  return localDB.teams.find(t => t.id === id);
 }
 
-function createTeam(name, username, password, emoji = '🚀') {
-  const db = getDB();
-  const id = 'team_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+async function createTeam(name, username, password, emoji = '🚀') {
   const team = {
-    id,
     name,
     username,
     password,
@@ -63,92 +112,83 @@ function createTeam(name, username, password, emoji = '🚀') {
     links: [],
     members: [],
     basePrice: 50,
-    totalRevenue: 0,    // all-time tokens earned
-    currentTokens: 0,   // current spendable tokens
+    totalRevenue: 0,
+    currentTokens: 0,
     investorCount: 0,
     uniqueInvestors: [],
-    revenueHistory: [],  // [{ round, amount }]
+    revenueHistory: [],
     createdAt: Date.now(),
-    mergedWith: null,    // team id if merged
+    mergedWith: null,
     isActive: true,
   };
-  db.teams.push(team);
-  saveDB(db);
-  return team;
+  const docRef = await addDoc(collection(db, 'teams'), team);
+  return { id: docRef.id, ...team };
 }
 
-function updateTeam(id, updates) {
-  const db = getDB();
-  const idx = db.teams.findIndex(t => t.id === id);
-  if (idx === -1) return null;
-  db.teams[idx] = { ...db.teams[idx], ...updates };
-  saveDB(db);
-  return db.teams[idx];
+async function updateTeam(id, updates) {
+  const teamRef = doc(db, 'teams', id);
+  await updateDoc(teamRef, updates);
+  return { id, ...updates };
 }
 
-function deleteTeam(id) {
-  const db = getDB();
-  db.teams = db.teams.filter(t => t.id !== id);
-  saveDB(db);
+async function deleteTeam(id) {
+  await deleteDoc(doc(db, 'teams', id));
 }
 
-function mergeTeams(teamId1, teamId2) {
-  const db = getDB();
-  const t1 = db.teams.find(t => t.id === teamId1);
-  const t2 = db.teams.find(t => t.id === teamId2);
+async function mergeTeams(teamId1, teamId2) {
+  const t1 = getTeamById(teamId1);
+  const t2 = getTeamById(teamId2);
   if (!t1 || !t2) return null;
 
-  // Merge tokens and investors
-  t1.currentTokens += t2.currentTokens;
-  t1.totalRevenue += t2.totalRevenue;
-  t1.uniqueInvestors = [...new Set([...t1.uniqueInvestors, ...t2.uniqueInvestors])];
-  t1.investorCount = t1.uniqueInvestors.length;
-  t1.mergedWith = t2.id;
-  t1.name = t1.name + ' × ' + t2.name;
+  await updateDoc(doc(db, 'teams', teamId1), {
+    currentTokens: increment(t2.currentTokens),
+    totalRevenue: increment(t2.totalRevenue),
+    uniqueInvestors: [...new Set([...t1.uniqueInvestors, ...t2.uniqueInvestors])],
+    investorCount: [...new Set([...t1.uniqueInvestors, ...t2.uniqueInvestors])].length,
+    name: t1.name + ' × ' + t2.name
+  });
 
-  // Mark t2 as merged
-  t2.isActive = false;
-  t2.mergedWith = t1.id;
+  await updateDoc(doc(db, 'teams', teamId2), {
+    isActive: false,
+    mergedWith: teamId1
+  });
 
-  saveDB(db);
-  return t1;
+  return getTeamById(teamId1);
 }
 
-function adjustTeamTokens(teamId, amount, type = 'add') {
-  const db = getDB();
-  const team = db.teams.find(t => t.id === teamId);
-  if (!team) return null;
+async function adjustTeamTokens(teamId, amount, type = 'add') {
+  const teamRef = doc(db, 'teams', teamId);
   if (type === 'add') {
-    team.currentTokens += amount;
-    team.totalRevenue += amount;
+    await updateDoc(teamRef, {
+      currentTokens: increment(amount),
+      totalRevenue: increment(amount)
+    });
   } else {
-    team.currentTokens = Math.max(0, team.currentTokens - amount);
+    // Note: increment with negative value. Max(0) needs to be handled carefully if needed.
+    await updateDoc(teamRef, {
+      currentTokens: increment(-amount)
+    });
   }
-  saveDB(db);
-  return team;
 }
 
 // ===== USER OPERATIONS =====
 function getUsers() {
-  return getDB().users;
+  return localDB.users;
 }
 
 function getUserById(id) {
-  return getDB().users.find(u => u.id === id);
+  return localDB.users.find(u => u.id === id);
 }
 
 function getUserByHallTicket(hallTicket) {
-  return getDB().users.find(u => u.hallTicket === hallTicket);
+  return localDB.users.find(u => u.hallTicket === hallTicket);
 }
 
-function createUser(hallTicket, password, name, college, section) {
-  const db = getDB();
-  if (db.users.find(u => u.hallTicket === hallTicket)) {
+async function createUser(hallTicket, password, name, college, section) {
+  if (localDB.users.find(u => u.hallTicket === hallTicket)) {
     return { error: 'Hall ticket already registered' };
   }
-  const id = 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   const user = {
-    id,
     hallTicket,
     password,
     name,
@@ -156,175 +196,205 @@ function createUser(hallTicket, password, name, college, section) {
     section,
     tokens: 0,
     totalTokensReceived: 0,
-    investments: [],  // [{ teamId, amount, round }]
+    investments: [],
     roundsParticipated: [],
     createdAt: Date.now(),
     isActive: true,
   };
-  db.users.push(user);
-  saveDB(db);
-  return user;
+  const docRef = await addDoc(collection(db, 'users'), user);
+  return { id: docRef.id, ...user };
 }
 
-function updateUser(id, updates) {
-  const db = getDB();
-  const idx = db.users.findIndex(u => u.id === id);
-  if (idx === -1) return null;
-  db.users[idx] = { ...db.users[idx], ...updates };
-  saveDB(db);
-  return db.users[idx];
+async function updateUser(id, updates) {
+  const userRef = doc(db, 'users', id);
+  await updateDoc(userRef, updates);
 }
 
 // ===== ROUND OPERATIONS =====
 function getCurrentRound() {
-  return getDB().currentRound;
+  return localDB.currentRound;
 }
 
-function startRound() {
-  const db = getDB();
-  db.roundCount += 1;
-  db.currentRound = {
-    number: db.roundCount,
+async function startRound() {
+  const number = localDB.roundCount + 1;
+  const round = {
+    number,
     status: 'live',
     startedAt: Date.now(),
     endedAt: null,
   };
 
-  // Give tokens to all users for this round
-  db.users.forEach(user => {
-    user.tokens += db.settings.tokensPerRound;
-    user.totalTokensReceived += db.settings.tokensPerRound;
-  });
+  const docRef = await addDoc(collection(db, 'rounds'), round);
 
-  saveDB(db);
-  return db.currentRound;
+  // Give tokens to all users for this round
+  // Batch updates would be better here, but for now simple loop
+  const userPromises = localDB.users.map(user =>
+    updateDoc(doc(db, 'users', user.id), {
+      tokens: increment(localDB.settings.tokensPerRound),
+      totalTokensReceived: increment(localDB.settings.tokensPerRound)
+    })
+  );
+  await Promise.all(userPromises);
+
+  return { id: docRef.id, ...round };
 }
 
-function endRound() {
-  const db = getDB();
-  if (!db.currentRound) return null;
-  db.currentRound.status = 'ended';
-  db.currentRound.endedAt = Date.now();
-  db.rounds.push({ ...db.currentRound });
-  saveDB(db);
-  return db.currentRound;
+async function endRound() {
+  if (!localDB.currentRound || localDB.currentRound.status !== 'live') return null;
+  const roundId = localDB.currentRound.id;
+  await updateDoc(doc(db, 'rounds', roundId), {
+    status: 'ended',
+    endedAt: Date.now()
+  });
+  return { ...localDB.currentRound, status: 'ended', endedAt: Date.now() };
 }
 
 // ===== INVESTMENT OPERATIONS =====
 function getInvestments() {
-  return getDB().investments;
+  return localDB.investments;
 }
 
 function getUserInvestmentsThisRound(userId) {
-  const db = getDB();
-  if (!db.currentRound) return [];
-  return db.investments.filter(
-    inv => inv.userId === userId && inv.round === db.currentRound.number
+  if (!localDB.currentRound) return [];
+  return localDB.investments.filter(
+    inv => inv.userId === userId && inv.round === localDB.currentRound.number
   );
 }
 
-function invest(userId, teamId, amount) {
-  const db = getDB();
-
-  if (!db.currentRound || db.currentRound.status !== 'live') {
+async function invest(userId, teamId, amount) {
+  if (!localDB.currentRound || localDB.currentRound.status !== 'live') {
     return { error: 'No active round' };
   }
 
-  const user = db.users.find(u => u.id === userId);
-  const team = db.teams.find(t => t.id === teamId);
+  const user = getUserById(userId);
+  const team = getTeamById(teamId);
 
   if (!user) return { error: 'User not found' };
   if (!team) return { error: 'Team not found' };
   if (!team.isActive) return { error: 'Team is not active' };
 
-  // Check investment limit
-  const thisRoundInvestments = db.investments.filter(
-    inv => inv.userId === userId && inv.round === db.currentRound.number
-  );
-  if (thisRoundInvestments.length >= db.settings.maxInvestmentsPerRound) {
-    return { error: `You can only invest in ${db.settings.maxInvestmentsPerRound} teams per round` };
+  const thisRoundInvestments = getUserInvestmentsThisRound(userId);
+  if (thisRoundInvestments.length >= localDB.settings.maxInvestmentsPerRound) {
+    return { error: `You can only invest in ${localDB.settings.maxInvestmentsPerRound} teams per round` };
   }
 
-  // Check if already invested in this team this round
   if (thisRoundInvestments.find(inv => inv.teamId === teamId)) {
     return { error: 'Already invested in this team this round' };
   }
 
-  // Check tokens
   if (user.tokens < amount) {
     return { error: 'Insufficient tokens' };
   }
 
-  // Minimum investment = team base price
   if (amount < team.basePrice) {
     return { error: `Minimum investment is ${team.basePrice} tokens` };
   }
 
-  // Deduct from user
-  user.tokens -= amount;
-
-  // Add to team
-  team.currentTokens += amount;
-  team.totalRevenue += amount;
-  team.investorCount += 1;
-  if (!team.uniqueInvestors.includes(userId)) {
-    team.uniqueInvestors.push(userId);
-  }
-
-  // Update revenue history
-  const existingHistory = team.revenueHistory.find(h => h.round === db.currentRound.number);
-  if (existingHistory) {
-    existingHistory.amount += amount;
-  } else {
-    team.revenueHistory.push({ round: db.currentRound.number, amount });
-  }
-
   // Record investment
   const investment = {
-    id: 'inv_' + Date.now(),
     userId,
     teamId,
     amount,
-    round: db.currentRound.number,
+    round: localDB.currentRound.number,
     timestamp: Date.now(),
   };
-  db.investments.push(investment);
 
-  // Add to user investments
-  user.investments.push({ teamId, amount, round: db.currentRound.number });
-  if (!user.roundsParticipated.includes(db.currentRound.number)) {
-    user.roundsParticipated.push(db.currentRound.number);
+  await addDoc(collection(db, 'investments'), investment);
+
+  // Update user
+  await updateDoc(doc(db, 'users', userId), {
+    tokens: increment(-amount),
+    investments: [...user.investments, { teamId, amount, round: localDB.currentRound.number }],
+    roundsParticipated: Array.from(new Set([...user.roundsParticipated, localDB.currentRound.number]))
+  });
+
+  // Update team
+  const newRevenueHistory = [...(team.revenueHistory || [])];
+  const historyIdx = newRevenueHistory.findIndex(h => h.round === localDB.currentRound.number);
+  if (historyIdx > -1) {
+    newRevenueHistory[historyIdx].amount += amount;
+  } else {
+    newRevenueHistory.push({ round: localDB.currentRound.number, amount });
   }
 
-  saveDB(db);
-  return { success: true, investment };
+  await updateDoc(doc(db, 'teams', teamId), {
+    currentTokens: increment(amount),
+    totalRevenue: increment(amount),
+    investorCount: increment(1),
+    uniqueInvestors: Array.from(new Set([...(team.uniqueInvestors || []), userId])),
+    revenueHistory: newRevenueHistory
+  });
+
+  return { success: true };
 }
+
 
 // ===== STATS =====
 function getGlobalStats() {
-  const db = getDB();
-  const totalTokens = db.teams.reduce((s, t) => s + t.currentTokens, 0) +
-    db.users.reduce((s, u) => s + u.tokens, 0);
+  const totalTokens = localDB.teams.reduce((s, t) => s + (t.currentTokens || 0), 0) +
+    localDB.users.reduce((s, u) => s + (u.tokens || 0), 0);
   return {
-    teamCount: db.teams.filter(t => t.isActive).length,
-    investorCount: db.users.length,
+    teamCount: localDB.teams.filter(t => t.isActive).length,
+    investorCount: localDB.users.length,
     totalTokens,
-    currentRound: db.currentRound,
+    currentRound: localDB.currentRound,
   };
 }
 
 // ===== SEED DEMO DATA =====
-function seedDemoData() {
-  const db = getDB();
-  if (db.teams.length > 0) return; // already seeded
+async function seedDemoData() {
+  if (localDB.teams.length > 0) return;
 
-  // Create sample teams
   const teams = [
     { name: 'EcoVenture', username: 'ecoventure', password: 'eco123', emoji: '🌱' },
     { name: 'TechNova', username: 'technova', password: 'tech123', emoji: '💡' },
     { name: 'HealthBridge', username: 'healthbridge', password: 'health123', emoji: '🏥' },
   ];
 
-  teams.forEach(t => createTeam(t.name, t.username, t.password, t.emoji));
-  saveDB(getDB());
+  for (const t of teams) {
+    await createTeam(t.name, t.username, t.password, t.emoji);
+  }
 }
+
+// Attach functions to window for onclick handlers
+window.getDB = getDB;
+window.saveDB = saveDB;
+window.resetDB = resetDB;
+window.getTeams = getTeams;
+window.getTeamById = getTeamById;
+window.createTeam = createTeam;
+window.updateTeam = updateTeam;
+window.deleteTeam = deleteTeam;
+window.mergeTeams = mergeTeams;
+window.adjustTeamTokens = adjustTeamTokens;
+window.getUsers = getUsers;
+window.getUserById = getUserById;
+window.getUserByHallTicket = getUserByHallTicket;
+window.createUser = createUser;
+window.updateUser = updateUser;
+window.getCurrentRound = getCurrentRound;
+window.startRound = startRound;
+window.endRound = endRound;
+window.getInvestments = getInvestments;
+window.getUserInvestmentsThisRound = getUserInvestmentsThisRound;
+window.invest = invest;
+window.getGlobalStats = getGlobalStats;
+window.seedDemoData = seedDemoData;
+
+// Kick off sync with error handling
+try {
+  initDataSync();
+} catch (error) {
+  console.error("Failed to initialize Firebase sync. Check your configuration and internet connection.", error);
+}
+
+export {
+  getDB, saveDB, resetDB,
+  getTeams, getTeamById, createTeam, updateTeam, deleteTeam, mergeTeams, adjustTeamTokens,
+  getUsers, getUserById, getUserByHallTicket, createUser, updateUser,
+  getCurrentRound, startRound, endRound,
+  getInvestments, getUserInvestmentsThisRound, invest,
+  getGlobalStats, seedDemoData
+};
+
+

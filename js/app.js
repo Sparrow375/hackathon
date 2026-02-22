@@ -1,30 +1,25 @@
+import {
+    getUserById,
+    getGlobalStats
+} from './data.js';
+import {
+    currentUser,
+    closeModal,
+    updateLandingStats
+} from './auth.js';
+import { renderAudienceDashboard } from './audience-dashboard.js';
+import { renderTeamDashboard } from './team-dashboard.js';
+import { renderAdminDashboard } from './admin-dashboard.js';
+
+
 // ===== APP INIT =====
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Seed demo data on first load
-    seedDemoData();
-
-    // Update landing page stats
+    // Initial UI update
     updateLandingStats();
 
-    // Refresh stats every 5 seconds (simulating real-time)
-    setInterval(() => {
-        if (document.getElementById('page-landing').classList.contains('active')) {
-            updateLandingStats();
-        }
-        // Auto-refresh dashboards if logged in
-        if (currentUser && document.getElementById('page-audience').classList.contains('active')) {
-            // Soft refresh - only update token count and round status
-            const freshUser = getUserById(currentUser.id);
-            if (freshUser) {
-                currentUser = freshUser;
-                // Only re-render if on home view to avoid disrupting team detail
-                if (audienceView === 'home') {
-                    renderAudienceDashboard(currentUser);
-                }
-            }
-        }
-    }, 8000);
+    // Animate stats on landing
+    animateStats();
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -39,8 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Animate stats on landing
-    animateStats();
+    // Note: Most UI updates are now handled by Firestore's onSnapshot listeners
+    // which call updateUI() in data.js.
 });
 
 function animateStats() {
@@ -65,4 +60,5 @@ function animateNumber(id, from, to, duration) {
     requestAnimationFrame(update);
 }
 
-// getDB, DB_KEY, DEFAULT_DATA are all defined in data.js (loaded first)
+window.animateStats = animateStats;
+window.animateNumber = animateNumber;

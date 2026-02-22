@@ -1,14 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pitch It Up — Business Hackathon</title>
-  <meta name="description" content="Pitch It Up is an interactive business hackathon event where teams pitch, audiences invest, and the best idea wins." />
+  <meta name="description"
+    content="Pitch It Up is an interactive business hackathon event where teams pitch, audiences invest, and the best idea wins." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
   <link rel="stylesheet" href="css/main.css" />
 </head>
+
 <body>
   <div id="app">
     <!-- Landing Page -->
@@ -35,11 +40,11 @@
             Business Hackathon 2026
           </div>
           <h1 class="hero-title">
-            Where Ideas<br/>
+            Where Ideas<br />
             <span class="gradient-text">Become Empires</span>
           </h1>
           <p class="hero-subtitle">
-            Pitch your startup, attract investors, dominate the market.<br/>
+            Pitch your startup, attract investors, dominate the market.<br />
             The arena is live. Are you ready?
           </p>
 
@@ -125,11 +130,12 @@
   <!-- Toast -->
   <div id="toast-container"></div>
 
-  <script src="js/data.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/team-dashboard.js"></script>
-  <script src="js/audience-dashboard.js"></script>
-  <script src="js/admin-dashboard.js"></script>
-  <script src="js/app.js"></script>
+  <script>
+    if (window.location.protocol === 'file:') {
+      console.warn('⚠️ Pitch It Up: ESM Modules (type="module") require a local server to work correctly. If buttons are not working, please open this project using a local server like Live Server (VS Code) or by running "npx serve" in this directory.');
+    }
+  </script>
+  <script type="module" src="js/app.js"></script>
 </body>
+
 </html>

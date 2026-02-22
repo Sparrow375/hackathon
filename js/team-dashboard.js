@@ -1,13 +1,21 @@
+import {
+  getTeamById,
+  getCurrentRound,
+  getDB,
+  updateTeam
+} from './data.js';
+import { currentTeam, logout, showToast } from './auth.js';
+
 // ===== TEAM DASHBOARD =====
 
 function renderTeamDashboard(team) {
-    team = getTeamById(team.id); // fresh data
-    const root = document.getElementById('team-dashboard-root');
-    const round = getCurrentRound();
-    const db_data = getDB();
-    const teamInvestments = db_data.investments.filter(i => i.teamId === team.id);
+  team = getTeamById(team.id) || team; // fresh data
+  const root = document.getElementById('team-dashboard-root');
+  const round = getCurrentRound();
+  const db_data = getDB();
+  const teamInvestments = (db_data.investments || []).filter(i => i.teamId === team.id);
 
-    root.innerHTML = `
+  root.innerHTML = `
     <div class="dashboard">
       <nav class="dash-nav">
         <div class="dash-logo">
@@ -57,22 +65,22 @@ function renderTeamDashboard(team) {
           <div class="metric-card purple">
             <div class="metric-icon">🪙</div>
             <div class="metric-label">Current Tokens</div>
-            <div class="metric-value purple">${team.currentTokens.toLocaleString()}</div>
+            <div class="metric-value purple">${(team.currentTokens || 0).toLocaleString()}</div>
           </div>
           <div class="metric-card amber">
             <div class="metric-icon">📈</div>
             <div class="metric-label">Total Revenue</div>
-            <div class="metric-value amber">${team.totalRevenue.toLocaleString()}</div>
+            <div class="metric-value amber">${(team.totalRevenue || 0).toLocaleString()}</div>
           </div>
           <div class="metric-card cyan">
             <div class="metric-icon">👥</div>
             <div class="metric-label">Total Investors</div>
-            <div class="metric-value cyan">${team.investorCount}</div>
+            <div class="metric-value cyan">${team.investorCount || 0}</div>
           </div>
           <div class="metric-card green">
             <div class="metric-icon">✨</div>
             <div class="metric-label">Unique Investors</div>
-            <div class="metric-value green">${team.uniqueInvestors.length}</div>
+            <div class="metric-value green">${(team.uniqueInvestors || []).length}</div>
           </div>
           <div class="metric-card purple">
             <div class="metric-icon">💰</div>
@@ -155,27 +163,26 @@ function renderTeamDashboard(team) {
 }
 
 function renderTeamInvestmentsTab(team, investments) {
-    const rounds = [...new Set(investments.map(i => i.round))].sort((a, b) => b - a);
-
-    if (investments.length === 0) {
-        return `<div class="empty-state">
+  if (investments.length === 0) {
+    return `<div class="empty-state">
       <div class="empty-state-icon">📭</div>
       <h3>No investments yet</h3>
       <p>Investments will appear here once a round starts and investors back your team</p>
     </div>`;
-    }
+  }
 
-    // Revenue chart
-    const db = getDB();
-    const maxRound = db.roundCount || 1;
-    const chartBars = [];
-    for (let r = 1; r <= maxRound; r++) {
-        const hist = team.revenueHistory.find(h => h.round === r);
-        chartBars.push({ round: r, amount: hist ? hist.amount : 0 });
-    }
-    const maxAmount = Math.max(...chartBars.map(b => b.amount), 1);
+  // Revenue chart
+  const db = getDB();
+  const maxRound = db.roundCount || 1;
+  const chartBars = [];
+  const revenueHistory = team.revenueHistory || [];
+  for (let r = 1; r <= maxRound; r++) {
+    const hist = revenueHistory.find(h => h.round === r);
+    chartBars.push({ round: r, amount: hist ? hist.amount : 0 });
+  }
+  const maxAmount = Math.max(...chartBars.map(b => b.amount), 1);
 
-    return `
+  return `
     <div class="chart-container">
       <div class="chart-title">Revenue per Round</div>
       <div class="bar-chart">
@@ -217,69 +224,76 @@ function renderTeamInvestmentsTab(team, investments) {
 }
 
 function switchTeamTab(tab, btn) {
-    document.querySelectorAll('#page-team .tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#page-team .tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('team-tab-' + tab).classList.add('active');
+  document.querySelectorAll('#page-team .tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#page-team .tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('team-tab-' + tab).classList.add('active');
 }
 
-function saveTeamProfile(teamId) {
-    const name = document.getElementById('team-edit-name').value.trim();
-    const tagline = document.getElementById('team-edit-tagline').value.trim();
-    const description = document.getElementById('team-edit-desc').value.trim();
-    const emoji = document.getElementById('team-edit-emoji').value.trim() || '🚀';
-    const membersRaw = document.getElementById('team-edit-members').value;
-    const linksRaw = document.getElementById('team-edit-links').value;
+async function saveTeamProfile(teamId) {
+  const name = document.getElementById('team-edit-name').value.trim();
+  const tagline = document.getElementById('team-edit-tagline').value.trim();
+  const description = document.getElementById('team-edit-desc').value.trim();
+  const emoji = document.getElementById('team-edit-emoji').value.trim() || '🚀';
+  const membersRaw = document.getElementById('team-edit-members').value;
+  const linksRaw = document.getElementById('team-edit-links').value;
 
-    if (!name) { showToast('Team name cannot be empty', 'error'); return; }
+  if (!name) { showToast('Team name cannot be empty', 'error'); return; }
 
-    const members = membersRaw.split(',').map(m => m.trim()).filter(Boolean);
-    const links = linksRaw.split('\n').map(l => {
-        const colonIdx = l.indexOf(':');
-        if (colonIdx === -1) return null;
-        return { label: l.slice(0, colonIdx).trim(), url: l.slice(colonIdx + 1).trim() };
-    }).filter(Boolean);
+  const members = membersRaw.split(',').map(m => m.trim()).filter(Boolean);
+  const links = linksRaw.split('\n').map(l => {
+    const colonIdx = l.indexOf(':');
+    if (colonIdx === -1) return null;
+    return { label: l.slice(0, colonIdx).trim(), url: l.slice(colonIdx + 1).trim() };
+  }).filter(Boolean);
 
-    const updated = updateTeam(teamId, { name, tagline, description, emoji, members, links });
-    if (updated) {
-        currentTeam = updated;
-        showToast('Profile updated! ✓', 'success');
-        renderTeamDashboard(updated);
-    }
+  await updateTeam(teamId, { name, tagline, description, emoji, members, links });
+  showToast('Profile updated! ✓', 'success');
+  const updated = getTeamById(teamId);
+  renderTeamDashboard(updated);
 }
 
-function saveTeamPrice(teamId) {
-    const price = parseInt(document.getElementById('team-base-price').value);
-    if (isNaN(price) || price < 30 || price > 100) {
-        showToast('Price must be between 30 and 100 tokens', 'error');
-        return;
-    }
-    const updated = updateTeam(teamId, { basePrice: price });
-    if (updated) {
-        currentTeam = updated;
-        showToast(`Base price set to ${price} tokens ✓`, 'success');
-    }
+async function saveTeamPrice(teamId) {
+  const price = parseInt(document.getElementById('team-base-price').value);
+  if (isNaN(price) || price < 30 || price > 100) {
+    showToast('Price must be between 30 and 100 tokens', 'error');
+    return;
+  }
+  await updateTeam(teamId, { basePrice: price });
+  showToast(`Base price set to ${price} tokens ✓`, 'success');
 }
 
-function changeTeamPassword(teamId) {
-    const oldPass = document.getElementById('team-old-pass').value;
-    const newPass = document.getElementById('team-new-pass').value;
-    const team = getTeamById(teamId);
-    if (team.password !== oldPass) {
-        showToast('Current password is incorrect', 'error');
-        return;
-    }
-    if (newPass.length < 4) {
-        showToast('New password must be at least 4 characters', 'error');
-        return;
-    }
-    updateTeam(teamId, { password: newPass });
-    showToast('Password changed successfully ✓', 'success');
-    document.getElementById('team-old-pass').value = '';
-    document.getElementById('team-new-pass').value = '';
+async function changeTeamPassword(teamId) {
+  const oldPass = document.getElementById('team-old-pass').value;
+  const newPass = document.getElementById('team-new-pass').value;
+  const team = getTeamById(teamId);
+  if (team.password !== oldPass) {
+    showToast('Current password is incorrect', 'error');
+    return;
+  }
+  if (newPass.length < 4) {
+    showToast('New password must be at least 4 characters', 'error');
+    return;
+  }
+  await updateTeam(teamId, { password: newPass });
+  showToast('Password changed successfully ✓', 'success');
+  document.getElementById('team-old-pass').value = '';
+  document.getElementById('team-new-pass').value = '';
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
+
+// Attach to window
+window.renderTeamDashboard = renderTeamDashboard;
+window.switchTeamTab = switchTeamTab;
+window.saveTeamProfile = saveTeamProfile;
+window.saveTeamPrice = saveTeamPrice;
+window.changeTeamPassword = changeTeamPassword;
+
+export { renderTeamDashboard };
+
