@@ -183,7 +183,7 @@ async function loginAsTeam() {
       fullError: error
     });
     // If user doesn't exist in Auth but exists in DB, try to create it
-    if (error.code === 'auth/user-not-found') {
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
       try {
         await createUserWithEmailAndPassword(auth, `${username}@${INTERNAL_DOMAIN_TEAM}`, password);
         loginAsTeam(); // Retry login
@@ -236,7 +236,7 @@ async function loginAsAudience() {
     showToast(`Welcome, ${user.name}! 💼`, 'success');
   } catch (error) {
     console.error("Audience login error:", error);
-    if (error.code === 'auth/user-not-found') {
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
       try {
         await createUserWithEmailAndPassword(auth, `${hallTicket}@${INTERNAL_DOMAIN_USER}`, password);
         loginAsAudience();
