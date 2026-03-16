@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Runway 2026 | Innovation & Startup Pitch Event</title>
+    <meta name="description" content="The Runway - Where Ideas Take Off. A startup simulation event by KMEC CSM Dept.">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/main.css">
+</head>
+
+<body>
+    <!-- Global Loader -->
+    <div id="global-loader" class="loader">
+        <div class="loader-content">
+            <h1 class="logo-title">THE<br>RUNWAY<br><span class="logo-year">2026</span></h1>
+            <div class="loader-bar-container">
+                <div class="loader-bar"></div>
+            </div>
+            <p class="loader-text">INITIALIZING FLIGHT SYSTEMS...</p>
+        </div>
+    </div>
+
+    <div id="app">
+        <!-- Main Landing Page -->
+        <main id="page-landing" class="page active">
+            <!-- Header (Navbar) -->
+            <header class="navbar">
+                <div class="logo">
+                    <span class="logo-title-small">THE RUNWAY <span class="accent">2026</span></span>
+                </div>
+                <!-- Will trigger the registration modal -->
+                <div class="nav-links">
+                    <button class="nav-text-btn" onclick="showPage('page-event-details')">Event Details</button>
+                    <button class="nav-text-btn" onclick="showModal('team-login')">Team Login</button>
+                    <button class="btn-primary" onclick="showModal('registration')">Register Now</button>
+                </div>
+            </header>
+
+            <!-- Hero Section -->
+            <section class="hero">
+                <div class="hero-bg-elements">
+                    <div class="grid-overlay"></div>
+                    <div class="glow-orb"></div>
+                </div>
+
+                <div class="hero-content">
+                    <div class="tagline fade-up">KMEC <span class="dot">•</span> CSM DEPARTMENT</div>
+
+                    <div class="hero-logo-center fade-up delay-1">
+                        <h1 class="main-logo-text">
+                            <span class="sm-the">THE</span><br>
+                            RUNWAY<br>
+                            <span class="sm-year">2026</span>
+                        </h1>
+                    </div>
+
+                    <p class="hero-subtitle fade-up delay-2">
+                        A one-day innovation and entrepreneurship event. Build prototypes, present
+                        your startup-style pitch, and secure your future.
+                    </p>
+                    <div class="hero-actions fade-up delay-3">
+                        <button class="btn-primary btn-large" onclick="showModal('registration')">Get Your Boarding
+                            Pass</button>
+                        <button class="btn-outline btn-large" onclick="showPage('page-event-details')">View Flight
+                            Details</button>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="navbar"
+                style="position: relative; border-top: 1px solid var(--border-light); border-bottom: none; opacity: 0.6; padding: 1.5rem 5%;">
+                <div style="font-size: 0.8rem; letter-spacing: 1px;">© 2026 KMEC CSM DEPARTMENT</div>
+                <button class="nav-text-btn" style="font-size: 0.75rem; letter-spacing: 2px; opacity: 0.8;"
+                    onclick="showPage('page-event-details'); setTimeout(() => document.getElementById('control-tower').scrollIntoView({behavior:'smooth'}), 100)">CONTACT
+                    US</button>
+                <div style="font-size: 0.8rem; letter-spacing: 1px;">THE RUNWAY</div>
+            </footer>
+        </main>
+
+        <!-- Event Details Page -->
+        <main id="page-event-details" class="page">
+            <header class="navbar">
+                <div class="logo" style="cursor: pointer;" onclick="showPage('page-landing')">
+                    <span class="logo-title-small">← BACK TO HOME</span>
+                </div>
+                <button class="btn-primary" onclick="showModal('registration')">Register</button>
+            </header>
+
+            <section class="details-section">
+                <div class="details-header fade-up">
+                    <h2 class="section-title">FLIGHT <span class="accent">DETAILS</span></h2>
+                    <p class="section-subtitle">Everything you need to know about The Runway</p>
+                </div>
+
+                <div class="info-container">
+                    <div class="info-card fade-up">
+                        <div class="card-icon">01</div>
+                        <h3>The Mission</h3>
+                        <p>The Runway is a one-day innovation and entrepreneurship event designed to encourage students
+                            to develop creative solutions, build prototypes, and present their ideas in a startup-style
+                            pitching environment.</p>
+                        <p class="mt-2">Participants will submit problem statements, develop prototypes, and present to
+                            judges and mentors across multiple rounds.</p>
+                    </div>
+
+                    <div class="info-card fade-up delay-1">
+                        <div class="card-icon">02</div>
+                        <h3>Flight Schedule</h3>
+                        <ul class="schedule-list">
+                            <li><strong>15 - 16 March:</strong> Registrations Open</li>
+                            <li><strong>17 March:</strong> Problem Statement Submission</li>
+                            <li><strong>26 March:</strong> Prototype Development Deadline</li>
+                            <li><strong>Event Day:</strong> Multiple Pitching Rounds (9:30 AM to 7:00 PM)</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-card fade-up delay-2">
+                        <div class="card-icon">03</div>
+                        <h3>Evaluation Rounds</h3>
+                        <ul class="schedule-list">
+                            <li><strong>Round 1 (9:30 AM):</strong> Prototype Evaluation (Innovation, Feasibility,
+                                Quality)</li>
+                            <li><strong>Round 2 (1:00 PM):</strong> Risk & Multiplier Pitching Round</li>
+                            <li><strong>Finals (5:00 PM):</strong> Final Investment Pitch & Winner Selection</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="details-header fade-up" style="margin-top: 8rem; margin-bottom: 3rem;">
+                    <h2 class="section-title">EVENT <span class="accent">DOMAINS</span></h2>
+                    <p class="section-subtitle">Select a focus area for your startup innovation</p>
+                </div>
+
+                <div class="info-container" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                    <div class="info-card fade-up">
+                        <h3>Fin Tech</h3>
+                        <p>Revolutionizing finance with digital payments, blockchain, and smart banking solutions.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Med Tech</h3>
+                        <p>Innovative medical devices and software to improve patient care and health outcomes.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Ed Tech</h3>
+                        <p>Modernizing education through digital learning platforms and interactive tools.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>E-Commerce</h3>
+                        <p>Hyper-local delivery and online shopping experiences for the next generation.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Govt Tech</h3>
+                        <p>Transforming public services with efficient, transparent G2G and G2C solutions.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Health & Lifestyle</h3>
+                        <p>Tech-driven wellness, fitness tracking, and personalized lifestyle improvements.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Productivity</h3>
+                        <p>Streamlining workflows and enhancing personal or professional efficiency.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Food Tech</h3>
+                        <p>Sustainable food production, distribution, and next-gen dining experiences.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Social Platforms</h3>
+                        <p>Building meaningful digital connections and vibrant online communities.</p>
+                    </div>
+                    <div class="info-card fade-up">
+                        <h3>Travel & Mobility</h3>
+                        <p>Smart urban transport, electric vehicles, and seamless travel planning.</p>
+                    </div>
+                </div>
+
+                <div id="control-tower" class="details-header fade-up"
+                    style="margin-top: 8rem; margin-bottom: 3rem;">
+                    <h2 class="section-title">THE CONTROL <span class="accent">TOWER</span></h2>
+                    <p class="section-subtitle">Reach out to us for any technical or logistical support</p>
+                </div>
+
+                <div class="info-container" style="justify-content: center;">
+                    <div class="info-card fade-up" style="text-align: center;">
+                        <h3>AVANEESH</h3>
+                        <p style="font-family: var(--font-display); letter-spacing: 1px; color: var(--text-main);">+91
+                            76665 90500</p>
+                    </div>
+                    <div class="info-card fade-up" style="text-align: center;">
+                        <h3>PRATHIKSH</h3>
+                        <p style="font-family: var(--font-display); letter-spacing: 1px; color: var(--text-main);">+91
+                            70953 63894</p>
+                    </div>
+                    <div class="info-card fade-up" style="text-align: center;">
+                        <h3>ANKUR</h3>
+                        <p style="font-family: var(--font-display); letter-spacing: 1px; color: var(--text-main);">+91
+                            72078 54116</p>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="navbar"
+                style="position: relative; border-top: 1px solid var(--border-light); border-bottom: none; opacity: 0.6; padding: 1.5rem 5%; margin-top: 4rem;">
+                <div style="font-size: 0.8rem; letter-spacing: 1px;">© 2026 KMEC CSM DEPARTMENT</div>
+                <button class="nav-text-btn" style="font-size: 0.75rem; letter-spacing: 2px; opacity: 0.8;"
+                    onclick="document.getElementById('control-tower').scrollIntoView({behavior:'smooth'})">CONTACT
+                    US</button>
+                <div style="font-size: 0.8rem; letter-spacing: 1px;">THE RUNWAY</div>
+            </footer>
+        </main>
+
+        <main id="page-team-dashboard" class="page">
+            <header class="navbar">
+                <div class="logo">
+                    <span class="logo-title-small">PASSENGER <span class="accent">LOUNGE</span></span>
+                </div>
+                <button class="btn-outline" onclick="logout()">Logout</button>
+            </header>
+
+            <section class="hero" style="min-height: 80vh;">
+                <!-- Content injected by renderTeamDashboard() in app.js -->
+                <div class="hero-content">
+                    <div class="tagline">PASSENGER LOUNGE</div>
+                    <p class="hero-subtitle" style="margin-top:1rem;">Authenticating...</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Hidden Admin Page -->
+        <main id="page-admin" class="page">
+            <header class="navbar">
+                <div class="logo">
+                    <span class="logo-title-small">FLIGHT <span class="accent">CONTROL</span></span>
+                </div>
+                <button class="btn-outline" onclick="logout()">Logout</button>
+            </header>
+            <div id="admin-dashboard-root"></div>
+        </main>
+    </div>
+
+    <!-- Modals Container -->
+    <!-- Removed onclick="closeModal()" from overlay so it doesn't close on accidental outside click -->
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal-box" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Main Application Scripts -->
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
